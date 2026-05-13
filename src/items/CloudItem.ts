@@ -51,6 +51,11 @@ export class CloudItem extends THREE.Points {
         super(geometry, material);
         this.frustumCulled = false; // often necessary for custom shaders or dynamic bounds
     }
+
+    updateViewport(height: number) {
+        const material = this.material as CloudShaderMaterial;
+        material.uniforms.viewportHeight.value = Math.max(height, 1);
+    }
 }
 
 export class CloudShaderMaterial extends THREE.ShaderMaterial {
@@ -63,6 +68,7 @@ export class CloudShaderMaterial extends THREE.ShaderMaterial {
             colorMode: { value: colorModeToUniformValue(options.colorMode) },
             flatColor: { value: new THREE.Color(options.color || 'white') },
             pointType: { value: pointTypeToUniformValue(options.pointType) },
+            viewportHeight: { value: 1.0 },
         };
 
         const vertexShader = `
@@ -74,6 +80,8 @@ export class CloudShaderMaterial extends THREE.ShaderMaterial {
             uniform float pointSize;
             uniform float colorMode;
             uniform vec3 flatColor;
+            uniform float pointType;
+            uniform float viewportHeight;
 
             vec3 getRainbowColor(float value_raw) {
                 float range = vmax - vmin;
@@ -99,7 +107,10 @@ export class CloudShaderMaterial extends THREE.ShaderMaterial {
 
                 vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
                 gl_Position = projectionMatrix * mvPosition;
-                gl_PointSize = pointSize;
+
+                float worldPointSize = (pointSize * 0.01) * projectionMatrix[1][1] * viewportHeight * 0.5 / max(abs(gl_Position.w), 0.0001);
+                float worldMode = step(0.5, pointType);
+                gl_PointSize = mix(pointSize, worldPointSize, worldMode);
             }
         `;
 

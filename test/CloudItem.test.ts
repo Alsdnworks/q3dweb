@@ -49,6 +49,13 @@ describe('CloudItem geometry & uniforms', () => {
     expect(m.uniforms.pointType.value).toBe(2);
   });
 
+  it('updates viewport height for world-space point sizing', () => {
+    const cloud = new CloudItem(new Float32Array(3), new Float32Array(1), { pointType: 'SQUARE' });
+    cloud.updateViewport(720);
+    const m = cloud.material as THREE.ShaderMaterial;
+    expect(m.uniforms.viewportHeight.value).toBe(720);
+  });
+
   it('uses branch-light shader code for color selection and point masking', () => {
     const cloud = new CloudItem(new Float32Array(3), new Float32Array(1), { pointType: 'SPHERE', colorMode: 'RGB' }, new Uint8Array([255, 0, 0]));
     const m = cloud.material as THREE.ShaderMaterial;
@@ -57,5 +64,7 @@ describe('CloudItem geometry & uniforms', () => {
     expect(m.fragmentShader).not.toContain('discard');
     expect(m.vertexShader).toContain('mix(');
     expect(m.fragmentShader).toContain('step(');
+    expect(m.vertexShader).toContain('viewportHeight');
+    expect(m.vertexShader).toContain('projectionMatrix[1][1]');
   });
 });

@@ -763,18 +763,73 @@ export class Viewer {
     buildCloudItemSettings(item: THREE.Object3D, mat: any, container: HTMLElement) {
         const geometry = (item as any).geometry as THREE.BufferGeometry | undefined;
         const pointCount = geometry?.getAttribute('position')?.count;
+        const pointTypeUniform = mat.uniforms.pointType;
+        const pointSizeUniform = mat.uniforms.pointSize;
+        const pixelRatio = this.getBaseRendererPixelRatio();
+        const isPixelPointType = (value: number) => value < 0.5;
+        const getSizeLabelText = () => {
+            if (!pointTypeUniform) return 'Size:';
+            return isPixelPointType(pointTypeUniform.value) ? 'Size (pixel):' : 'Size (cm):';
+        };
+        const getPointSizeInputValue = () => {
+            if (!pointSizeUniform) return 0;
+            return pointTypeUniform && isPixelPointType(pointTypeUniform.value)
+                ? pointSizeUniform.value / pixelRatio
+                : pointSizeUniform.value;
+        };
+        const setStoredPointSize = (value: number) => {
+            if (!pointSizeUniform) return;
+            pointSizeUniform.value = pointTypeUniform && isPixelPointType(pointTypeUniform.value)
+                ? value * pixelRatio
+                : value;
+        };
+        let sizeLabel: HTMLElement | null = null;
+        let sizeInput: HTMLInputElement | null = null;
 
         if (typeof pointCount === 'number') {
             container.appendChild(this.makeLabel('Points:'));
             container.appendChild(this.makeStaticValue(`${pointCount.toLocaleString()} pts`));
         }
 
-        if (mat.uniforms.pointSize) {
-            container.appendChild(this.makeLabel('Size:'));
-            container.appendChild(this.makeNumberInput(
-                mat.uniforms.pointSize.value / window.devicePixelRatio, 0, 100, 1,
-                (v) => { mat.uniforms.pointSize.value = v * window.devicePixelRatio; mat.needsUpdate = true; this.requestRender(); }
+        if (pointTypeUniform) {
+            container.appendChild(this.makeLabel('Point Type:'));
+            container.appendChild(this.makeSelectInput(
+                [
+                    { label: 'pixels', value: '0' },
+                    { label: 'flat squares', value: '1' },
+                    { label: 'spheres', value: '2' },
+                ],
+                String(pointTypeUniform.value),
+                (value) => {
+                    const nextPointType = parseInt(value, 10);
+                    const wasPixelPoint = isPixelPointType(pointTypeUniform.value);
+                    const willPixelPoint = isPixelPointType(nextPointType);
+
+                    if (pointSizeUniform) {
+                        if (wasPixelPoint && !willPixelPoint) {
+                            pointSizeUniform.value /= pixelRatio;
+                        } else if (!wasPixelPoint && willPixelPoint) {
+                            pointSizeUniform.value *= pixelRatio;
+                        }
+                    }
+
+                    pointTypeUniform.value = nextPointType;
+                    if (sizeLabel) sizeLabel.textContent = getSizeLabelText();
+                    if (sizeInput) sizeInput.value = getPointSizeInputValue().toString();
+                    mat.needsUpdate = true;
+                    this.requestRender();
+                }
             ));
+        }
+
+        if (pointSizeUniform) {
+            sizeLabel = this.makeLabel(getSizeLabelText());
+            container.appendChild(sizeLabel);
+            sizeInput = this.makeNumberInput(
+                getPointSizeInputValue(), 0, 100, 1,
+                (v) => { setStoredPointSize(v); mat.needsUpdate = true; this.requestRender(); }
+            );
+            container.appendChild(sizeInput);
         }
 
         if (mat.uniforms.alpha) {
@@ -1068,6 +1123,7 @@ export class Viewer {
         this.rendererPixelRatio = Math.max(pixelRatio, 1);
         this.renderer.setPixelRatio(this.rendererPixelRatio);
         this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+        this.syncAllCloudItemViewports();
         this.requestRender();
     }
 
@@ -1076,6 +1132,20 @@ export class Viewer {
         if (Math.abs(this.rendererPixelRatio - basePixelRatio) > 1e-6) {
             this.applyRendererResolution(basePixelRatio);
         }
+    }
+
+    private getCloudViewportHeight(): number {
+        return Math.max(this.container.clientHeight * this.rendererPixelRatio, 1);
+    }
+
+    private syncCloudItemViewport(item: THREE.Object3D): void {
+        if (item instanceof CloudItem) {
+            item.updateViewport(this.getCloudViewportHeight());
+        }
+    }
+
+    private syncAllCloudItemViewports(): void {
+        Object.values(this.items).forEach((item) => this.syncCloudItemViewport(item));
     }
 
     private setFilmMakerPlayButtonState(isPlaying: boolean): void {
@@ -2784,6 +2854,7 @@ export class Viewer {
         if (this.items[name]) this.removeItem(name);
         this.items[name] = object;
         this.scene.add(object);
+        this.syncCloudItemViewport(object);
         // Auto-switch to the newly-loaded cloud tab regardless of panel
         // visibility so that when the panel is re-opened with M the user
         // sees the cloud they just loaded rather than a stale fallback.
@@ -2824,6 +2895,7 @@ export class Viewer {
         this.camera.updateProjectionMatrix();
         this.renderer.setPixelRatio(this.rendererPixelRatio);
         this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+        this.syncAllCloudItemViewports();
         this.requestRender();
     }
 

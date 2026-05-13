@@ -213,13 +213,26 @@ describe('Viewer settings panel', () => {
     const positions = new Float32Array([0, 0, 0, 1, 1, 1, 2, 2, 2]);
     const values = new Float32Array([0, 1, 2]);
     const rgb = new Uint8Array([255, 0, 0, 0, 255, 0, 0, 0, 255]);
-    const cloud = await import('../src/items/CloudItem').then(m => new m.CloudItem(positions, values, { size: 1, alpha: 0.5, colorMode: 'RGB' }, rgb));
+    const cloudModule = await import('../src/items/CloudItem');
+    const cloud = new cloudModule.CloudItem(positions, values, { size: 1, alpha: 0.5, colorMode: 'RGB' }, rgb);
+    const material = cloud.material as THREE.ShaderMaterial;
     v.addItem('cloud', cloud);
+    expect(material.uniforms.viewportHeight.value).toBeGreaterThan(0);
+
     v.onSettingsItemSelected('cloud');
     expect(v.settingsContent!.children.length).toBeGreaterThan(0);
+    expect(v.settingsContent!.textContent).toContain('Point Type:');
 
     // Trigger numeric and select inputs
     const numbers = v.settingsContent!.querySelectorAll('input[type=number]');
+    const selects = v.settingsContent!.querySelectorAll('select');
+    expect(selects.length).toBe(2);
+
+    const pointTypeSelect = selects[0] as HTMLSelectElement;
+    pointTypeSelect.value = '2';
+    pointTypeSelect.onchange?.(new Event('change'));
+    expect(material.uniforms.pointType.value).toBe(2);
+
     for (const n of Array.from(numbers)) {
       (n as HTMLInputElement).value = '5';
       (n as HTMLInputElement).onchange?.(new Event('change'));
@@ -227,7 +240,6 @@ describe('Viewer settings panel', () => {
       (n as HTMLInputElement).value = 'bad';
       (n as HTMLInputElement).onchange?.(new Event('change'));
     }
-    const selects = v.settingsContent!.querySelectorAll('select');
     for (const s of Array.from(selects)) {
       (s as HTMLSelectElement).value = '1';
       (s as HTMLSelectElement).onchange?.(new Event('change'));

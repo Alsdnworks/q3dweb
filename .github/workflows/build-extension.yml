@@ -1,4 +1,4 @@
-name: Build VS Code Extension
+name: VS Code Extension
 
 on:
   push:
