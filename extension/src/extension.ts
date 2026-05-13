@@ -1,0 +1,234 @@
+import * as vscode from 'vscode';
+import * as path from 'path';
+import * as fs from 'fs';
+
+export function activate(context: vscode.ExtensionContext) {
+    // Register the custom editor provider
+    context.subscriptions.push(
+        vscode.window.registerCustomEditorProvider(
+            PcdViewerProvider.viewType,
+            new PcdViewerProvider(context),
+            {
+                webviewOptions: {
+                    retainContextWhenHidden: true,
+                },
+                supportsMultipleEditorsPerDocument: false,
+            }
+        )
+    );
+}
+
+class PcdDocument implements vscode.CustomDocument {
+    constructor(
+        public readonly uri: vscode.Uri
+    ) { }
+
+    dispose(): void { }
+}
+
+class PcdViewerProvider implements vscode.CustomReadonlyEditorProvider<PcdDocument> {
+
+    public static readonly viewType = 'q3dviewer.pcdViewer';
+
+    constructor(
+        private readonly context: vscode.ExtensionContext
+    ) { }
+
+    public async openCustomDocument(
+        uri: vscode.Uri,
+        _openContext: vscode.CustomDocumentOpenContext,
+        _token: vscode.CancellationToken
+    ): Promise<PcdDocument> {
+        return new PcdDocument(uri);
+    }
+
+    /**
+     * Called when our custom editor is opened.
+     */
+    public async resolveCustomEditor(
+        document: PcdDocument,
+        webviewPanel: vscode.WebviewPanel,
+        _token: vscode.CancellationToken
+    ): Promise<void> {
+        // Setup initial content for the webview
+        webviewPanel.webview.options = {
+            enableScripts: true,
+             localResourceRoots: [
+                vscode.Uri.file(path.join(this.context.extensionPath, 'webview-dist'))
+            ]
+        };
+
+        let webviewReady = false;
+        const tryUpdateWebview = () => {
+            if (webviewReady) {
+                void this.updateWebview(webviewPanel, document);
+            }
+        };
+
+        // Receive messages before setting HTML to avoid missing an early "ready".
+        const messageSubscription = webviewPanel.webview.onDidReceiveMessage(async e => {
+            switch (e.type) {
+                case 'ready':
+                    webviewReady = true;
+                    tryUpdateWebview();
+                    return;
+                case 'saveVideo': {
+                    try {
+                        const defaultName = typeof e.filename === 'string' && e.filename ? e.filename : 'q3dweb.webm';
+                        const ext = defaultName.toLowerCase().endsWith('.mp4') ? 'mp4' : 'webm';
+                        // Suggest next to the opened document if it is a workspace file.
+                        const baseDir = document.uri.scheme === 'file'
+                            ? path.dirname(document.uri.fsPath)
+                            : (vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? require('os').homedir());
+                        const defaultUri = vscode.Uri.file(path.join(baseDir, defaultName));
+                        const target = await vscode.window.showSaveDialog({
+                            defaultUri,
+                            filters: ext === 'mp4' ? { 'MP4 Video': ['mp4'] } : { 'WebM Video': ['webm'] },
+                            title: 'Save recorded video',
+                        });
+                        if (!target) return;
+                        const bytes: Uint8Array = e.data instanceof Uint8Array
+                            ? e.data
+                            : new Uint8Array(e.data ?? []);
+                        await vscode.workspace.fs.writeFile(target, bytes);
+                        vscode.window.showInformationMessage(`Saved recording to ${target.fsPath}`);
+                    } catch (err) {
+                        console.error('saveVideo failed:', err);
+                        vscode.window.showErrorMessage(`Failed to save recording: ${err instanceof Error ? err.message : String(err)}`);
+                    }
+                    return;
+                }
+            }
+        });
+
+        webviewPanel.webview.html = this.getHtmlForWebview(webviewPanel.webview);
+
+        // Listen for changes in the document (file change on disk)
+        const changeDocumentSubscription = vscode.workspace.onDidChangeTextDocument(_e => {
+            // For binary files, we use a file watcher instead
+        });
+        
+        // Use a file watcher to reload data if changed externally
+        const watcher = vscode.workspace.createFileSystemWatcher(document.uri.fsPath);
+        watcher.onDidChange(() => {
+             tryUpdateWebview();
+        });
+        watcher.onDidCreate(() => {
+            tryUpdateWebview();
+        });
+
+        // Make sure we get rid of the listener when our editor is closed.
+        webviewPanel.onDidDispose(() => {
+            changeDocumentSubscription.dispose();
+            messageSubscription.dispose();
+            watcher.dispose();
+        });
+    }
+
+    private getHtmlForWebview(webview: vscode.Webview): string {
+        const scriptUri = webview.asWebviewUri(vscode.Uri.file(
+            path.join(this.context.extensionPath, 'webview-dist', 'assets', 'main.js')
+        ));
+        const viewerChunkUri = webview.asWebviewUri(vscode.Uri.file(
+            path.join(this.context.extensionPath, 'webview-dist', 'assets', 'viewer.js')
+        ));
+        const styleUri = webview.asWebviewUri(vscode.Uri.file(
+            path.join(this.context.extensionPath, 'webview-dist', 'assets', 'viewer.css')
+        ));
+
+        // Use a nonce to whitelist which scripts can be run
+        const nonce = getNonce();
+
+        return /* html */`
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src ${webview.cspSource}; connect-src 'self' data: blob: ${webview.cspSource} https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://cyberjapandata.gsi.go.jp; img-src ${webview.cspSource} 'self' data: blob: https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://cyberjapandata.gsi.go.jp; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' ${webview.cspSource} 'unsafe-eval' 'wasm-unsafe-eval';">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <link rel="stylesheet" type="text/css" href="${styleUri}" />
+                <title>WebQ3D Viewer</title>
+                <style>
+                    body { margin: 0; overflow: hidden; width: 100vw; height: 100vh; }
+                    #app { width: 100%; height: 100%; }
+                </style>
+            </head>
+            <body>
+                <div id="app"></div>
+                <script type="module" nonce="${nonce}" src="${scriptUri}"></script>
+            </body>
+            </html>`;
+    }
+
+    /**
+     * Send data to webview
+     */
+    private async updateWebview(webviewPanel: vscode.WebviewPanel, document: PcdDocument) {
+        try {
+             if (document.uri.scheme === 'file') {
+                 const filePath = document.uri.fsPath;
+                 const stats = fs.statSync(filePath);
+                 const totalSize = stats.size;
+                 const chunkSize = 1 * 1024 * 1024; // 1MB chunks for reliable webview messaging
+                 const buffer = Buffer.alloc(chunkSize);
+                 const fd = fs.openSync(filePath, 'r');
+                 
+                 const startDelivered = await webviewPanel.webview.postMessage({ type: 'startStream', totalSize, filename: path.basename(filePath) });
+                 if (!startDelivered) {
+                     console.warn('Webview is not ready to receive startStream message.');
+                     fs.closeSync(fd);
+                     return;
+                 }
+
+                 let offset = 0;
+                 try {
+                     while (offset < totalSize) {
+                         const bytesRead = fs.readSync(fd, buffer, 0, chunkSize, offset);
+                         const dataToSend = new Uint8Array(buffer.subarray(0, bytesRead));
+                         
+                         const delivered = await webviewPanel.webview.postMessage({ 
+                             type: 'chunk', 
+                             data: dataToSend,
+                             offset 
+                         });
+                         if (!delivered) {
+                             console.warn('Webview rejected a chunk message. Stopping stream.');
+                             break;
+                         }
+                         
+                         offset += bytesRead;
+                         // Small yield to prevent event loop starvation
+                         await new Promise(resolve => setTimeout(resolve, 1));
+                     }
+                     
+                     await webviewPanel.webview.postMessage({ type: 'endStream' });
+                     
+                 } catch(err) {
+                    console.error("Error reading file chunks", err);
+                 } finally {
+                     fs.closeSync(fd);
+                 }
+
+             } else {
+                 // Fallback for non-file schemes (e.g. remote)
+                 const fileData = await vscode.workspace.fs.readFile(document.uri);
+                 webviewPanel.webview.postMessage({
+                     type: 'loadData',
+                     value: fileData,
+                     filename: path.basename(document.uri.fsPath)
+                 });
+             }
+        } catch (e) {
+            console.error('Failed to read file', e);
+        }
+    }
+}
+
+function getNonce() {
+    let text = '';
+    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    for (let i = 0; i < 32; i++) {
+        text += possible.charAt(Math.floor(Math.random() * possible.length));
+    }
+    return text;
+}

@@ -1,0 +1,16 @@
+{
+  "name": "e57-wasm",
+  "type": "module",
+  "version": "0.1.0",
+  "license": "MIT",
+  "files": [
+    "e57_wasm_bg.wasm",
+    "e57_wasm.js",
+    "e57_wasm.d.ts"
+  ],
+  "main": "e57_wasm.js",
+  "types": "e57_wasm.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

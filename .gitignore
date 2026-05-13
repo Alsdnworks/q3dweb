@@ -1,0 +1,49 @@
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
+
+# Build output
+dist/
+dist-ssr/
+*.local
+
+# Extension
+extension/node_modules/
+extension/dist/
+extension/out/
+extension/webview-dist/
+extension/*.vsix
+extension/.vscode-test/
+*.vsix
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs
+*.njsproj
+*.sln
+*.sw?
+
+# Testing
+coverage/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Playwright
+playwright-report/
+test-results/
+
+# Rust / wasm-pack build artifacts for vendor/e57-wasm
+# The compiled output in vendor/e57-wasm/pkg/ is committed intentionally so
+# that contributors don't need a Rust toolchain, but intermediate build
+# artifacts must be ignored.
+vendor/**/target/
+vendor/**/Cargo.lock

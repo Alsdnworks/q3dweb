@@ -1,0 +1,64 @@
+{
+  "name": "q3dviewer",
+  "displayName": "q3dviewer",
+  "description": "Point Cloud Viewer for VS Code (PCD, PLY, LAS, LAZ, E57)",
+  "version": "1.0.0",
+  "publisher": "panasonic-ad",
+  "icon": "media/at-logo-color-128x128.jpg",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.103.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "q3dviewer.pcdViewer",
+        "displayName": "Point Cloud Viewer",
+        "selector": [
+          {
+            "filenamePattern": "*.pcd"
+          },
+          {
+            "filenamePattern": "*.ply"
+          },
+          {
+            "filenamePattern": "*.las"
+          },
+          {
+            "filenamePattern": "*.laz"
+          },
+          {
+            "filenamePattern": "*.e57"
+          }
+        ],
+        "priority": "default"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "webpack",
+    "watch": "webpack --watch",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "lint": "eslint src"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.18",
+    "@types/vscode": "1.103.0",
+    "@vscode/vsce": "^3.9.1",
+    "eslint": "^9.39.4",
+    "ts-loader": "^9.5.7",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.2",
+    "webpack": "^5.106.2",
+    "webpack-cli": "^6.0.1"
+  },
+  "overrides": {
+    "diff": "^9.0.0",
+    "serialize-javascript": "^7.0.5"
+  }
+}

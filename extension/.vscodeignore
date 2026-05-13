@@ -1,0 +1,8 @@
+out
+src
+node_modules
+*.vsix
+.vscode-test/
+webpack.config.js
+eslint.config.mjs
+tsconfig.json
