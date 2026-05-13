@@ -125,8 +125,8 @@ The project is still evolving, but it is already useful for everyday inspection 
   - [q3dweb](https://github.com/Panasonic-Advanced-Technology/q3dweb)
   - [q3dviewer](https://github.com/scomup/q3dviewer)
 * Documentation
-  - [Building a lightweight point cloud viewer for VS Code and the browser](https://qiita.com/hrpad/items/588474a1b70d413104f8)
-  - [Open-sourcing a custom 3D point cloud viewer](https://qiita.com/scomup/items/75c942678c5be47e23e2)
+  - [VSCode とブラウザで使える軽量点群ビューアを作ってみた](https://qiita.com/hrpad/items/588474a1b70d413104f8)
+  - [自作の3D点群ビューアーをオープンソース化してみた](https://qiita.com/scomup/items/75c942678c5be47e23e2)
 
 ## License / Credits
 
