@@ -1,14 +1,14 @@
-name: Deploy Cloud Viewer to GitHub Pages
+name: GitHub Pages
 
 # Auto-deploy temporarily disabled. The workflow can still be launched
 # manually from the Actions tab. To re-enable automatic deploys on push,
 # un-comment the `push` block below.
 on:
   workflow_dispatch: {}
-  # push:
-  #   branches:
-  #     - main
-  #     - master
+  push:
+    branches:
+      - main
+      - master
 
 permissions:
   contents: read
