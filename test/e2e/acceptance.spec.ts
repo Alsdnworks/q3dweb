@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test';
 import {
   attachErrorSinks,
   dropFile,
+  getCloudSizeInput,
+  getCloudSizeLabel,
   readTestData,
   waitForPointCount,
   parsePointCount,
@@ -29,10 +31,10 @@ test.describe('acceptance', () => {
     // 2. Cloud item is auto-selected in the settings combo.
     const select = page.locator('select').first();
     await expect(select).toHaveValue('cloud');
-    await expect(page.locator('text=Size:')).toBeVisible();
+    await expect(getCloudSizeLabel(page)).toBeVisible();
 
     // 3. Bump the point size.
-    const sizeInput = page.locator('text=Size:').locator('xpath=following-sibling::input[1]');
+    const sizeInput = getCloudSizeInput(page);
     await sizeInput.fill('6');
     await sizeInput.press('Enter');
 

@@ -1,4 +1,4 @@
-import { Page, expect } from '@playwright/test';
+import { Locator, Page, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
@@ -90,4 +90,14 @@ export function parsePointCount(label: string): number {
   const m = label.match(/([\d,]+)\s*pts/);
   if (!m) return 0;
   return parseInt(m[1].replace(/,/g, ''), 10);
+}
+
+/** Locate the CloudItem size label regardless of whether units are shown. */
+export function getCloudSizeLabel(page: Page): Locator {
+  return page.getByText(/^Size(?: \((?:pixel|cm)\))?:$/).first();
+}
+
+/** Locate the CloudItem size input associated with the size label. */
+export function getCloudSizeInput(page: Page): Locator {
+  return getCloudSizeLabel(page).locator('xpath=following-sibling::input[1]');
 }

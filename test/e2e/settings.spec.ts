@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { dropFile, makeAsciiPLY, waitForPointCount } from './helpers';
+import { dropFile, getCloudSizeInput, getCloudSizeLabel, makeAsciiPLY, waitForPointCount } from './helpers';
 
 test.describe('settings panel', () => {
   test('background color input updates scene.background', async ({ page }) => {
@@ -45,7 +45,7 @@ test.describe('settings panel', () => {
     expect(optionValues).toContain('cloud');
 
     await expect(page.locator('text=Points:')).toBeVisible();
-    await expect(page.locator('text=Size:')).toBeVisible();
+    await expect(getCloudSizeLabel(page)).toBeVisible();
     await expect(page.locator('text=1,234 pts')).toBeVisible();
   });
 
@@ -55,9 +55,7 @@ test.describe('settings panel', () => {
     await dropFile(page, 'synth.ply', makeAsciiPLY(500));
     await waitForPointCount(page);
 
-    const sizeInput = page
-      .locator('text=Size:')
-      .locator('xpath=following-sibling::input[1]');
+    const sizeInput = getCloudSizeInput(page);
     await expect(sizeInput).toBeVisible();
 
     await sizeInput.fill('8');
