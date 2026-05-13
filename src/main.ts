@@ -9,7 +9,7 @@ try {
     const viewer = new Viewer('app');
     // Expose viewer on window for E2E tests and debugging.
     (window as any).__viewer = viewer;
-    console.log("WebQ3D Viewer Initialized.");
+    console.log("q3dviewer Initialized.");
     
     // Check if running in VS Code
     let vscode: any = null;
