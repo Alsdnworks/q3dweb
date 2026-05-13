@@ -1,5 +1,5 @@
-[![Tests](https://github.com/hrpad/q3dweb/actions/workflows/test.yml/badge.svg)](https://github.com/hrpad/q3dweb/actions/workflows/test.yml)
-![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/hrpad/44f1236040b42e01d04d874d5d23cb50/raw/q3dweb-coverage.json)
+[![Tests](https://github.com/Panasonic-Advanced-Technology/q3dweb/actions/workflows/test.yml/badge.svg)](https://github.com/Panasonic-Advanced-Technology/q3dweb/actions/workflows/test.yml)
+
 # q3dweb
 q3dweb is a lightweight 3D point cloud viewer for the browser and VS Code. It is designed to make point cloud data easy to view, share, and inspect without a heavy desktop setup.
 
