@@ -1,5 +1,4 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
 [![Tests](https://github.com/Panasonic-Advanced-Technology/q3dweb/actions/workflows/test.yml/badge.svg)](https://github.com/Panasonic-Advanced-Technology/q3dweb/actions/workflows/test.yml)
 [![Deploy Cloud Viewer to GitHub Pages](https://github.com/Panasonic-Advanced-Technology/q3dweb/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/Panasonic-Advanced-Technology/q3dweb/actions/workflows/deploy-pages.yml)
 # q3dweb
@@ -33,8 +32,10 @@ https://Panasonic-Advanced-Technology.github.io/q3dweb
 ### VS Code
 
 1. Search for `q3dviewer` in the VS Code Extensions view and install it.
-![vscode_install.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/3953399/e2d314d3-955c-4072-9728-f8732874c957.png)
-2. Open a supported point cloud file in VS Code and the q3dweb viewer will launch.
+
+<img width="1186" height="617" alt="vscode_install2" src="https://github.com/user-attachments/assets/34de4d3a-2953-4db0-ad72-470223968d52" />
+
+3. Open a supported point cloud file in VS Code and the q3dweb viewer will launch.
 
 ## Usage
 
@@ -68,7 +69,7 @@ The following map sources are available by default.
 - GSI Seamless Aerial Photo
 - GSI Blank Map
 
-![map.gif](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/3953399/43d9feba-a161-4399-bc73-087eea896dbb.gif)
+<img width="528" height="327" alt="map" src="https://github.com/user-attachments/assets/1dcf11f2-7fa0-466c-95f1-dee6a25ff064" />
 
 ### 3. Creating Demo Videos
 
