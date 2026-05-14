@@ -32,7 +32,7 @@ https://Panasonic-Advanced-Technology.github.io/q3dweb
 
 If you want to check the latest development build from the `develop` branch, use the preview URL below.
 
-https://Panasonic-Advanced-Technology.github.io/q3dweb/develop
+https://Panasonic-Advanced-Technology.github.io/q3dweb/develop/
 
 ### VS Code
 

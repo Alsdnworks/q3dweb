@@ -1,6 +1,6 @@
 name: GitHub Pages
 
-# Deploy the production site from main/master at the Pages root and
+# Deploy the production site from main at the Pages root and
 # the latest develop branch build under /develop.
 on:
   workflow_dispatch: {}
@@ -8,7 +8,6 @@ on:
     branches:
       - develop
       - main
-      - master
 
 permissions:
   contents: read
@@ -37,26 +36,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Resolve Pages branches
-        id: branches
-        run: |
-          if git ls-remote --exit-code --heads origin main >/dev/null 2>&1; then
-            echo "prod_branch=main" >> "$GITHUB_OUTPUT"
-          elif git ls-remote --exit-code --heads origin master >/dev/null 2>&1; then
-            echo "prod_branch=master" >> "$GITHUB_OUTPUT"
-          else
-            echo "Neither main nor master exists on origin." >&2
-            exit 1
-          fi
-
-          if ! git ls-remote --exit-code --heads origin develop >/dev/null 2>&1; then
-            echo "The develop branch does not exist on origin." >&2
-            exit 1
-          fi
-
       - name: Build production + develop Pages site
-        env:
-          PROD_BRANCH: ${{ steps.branches.outputs.prod_branch }}
         run: |
           set -euxo pipefail
 
@@ -67,7 +47,7 @@ jobs:
           rm -rf "$SITE_DIR" "$ROOT_WORKTREE" "$DEVELOP_WORKTREE"
           mkdir -p "$SITE_DIR"
 
-          git fetch --no-tags origin "$PROD_BRANCH" develop
+          git fetch --no-tags origin main develop
 
           build_site() {
             local branch="$1"
@@ -90,7 +70,7 @@ jobs:
             git worktree remove --force "$worktree"
           }
 
-          build_site "$PROD_BRANCH" "$ROOT_WORKTREE" ""
+          build_site main "$ROOT_WORKTREE" ""
           build_site develop "$DEVELOP_WORKTREE" "develop"
 
       - name: Configure Pages
