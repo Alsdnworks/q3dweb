@@ -27,7 +27,7 @@ test.describe('smoke', () => {
 
   test('settings panel is present on boot and can be toggled with M', async ({ page }) => {
     await page.goto('/');
-    const title = page.locator('text=Settings (Push M to toggle)');
+    const title = page.locator('text=Settings (M to toggle)');
     await expect(title).toBeVisible();
     const panel = title.locator('..');
 

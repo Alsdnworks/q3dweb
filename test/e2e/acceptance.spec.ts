@@ -46,9 +46,9 @@ test.describe('acceptance', () => {
     // 5. Toggle settings panel with M and back.
     await page.locator('#app').click({ position: { x: box.width - 20, y: box.height - 20 } });
     await page.keyboard.press('m');
-    await expect(page.locator('text=Settings (Push M to toggle)')).toBeHidden();
+    await expect(page.locator('text=Settings (M to toggle)')).toBeHidden();
     await page.keyboard.press('m');
-    await expect(page.locator('text=Settings (Push M to toggle)')).toBeVisible();
+    await expect(page.locator('text=Settings (M to toggle)')).toBeVisible();
 
     // 6. Ctrl+click measurement. We do not assert overlay presence (depends on ray hit),
     //    only that the app is still healthy.
