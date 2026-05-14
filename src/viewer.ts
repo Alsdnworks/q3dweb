@@ -224,7 +224,7 @@ export class Viewer {
         this.renderer.setPixelRatio(this.rendererPixelRatio);
         this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
         // Make the canvas focusable so clicking it steals focus from form inputs,
-        // ensuring keyboard shortcuts (e.g. M to toggle settings) work as expected.
+        // ensuring keyboard shortcuts (e.g. Push M to toggle settings) work as expected.
         this.renderer.domElement.tabIndex = 0;
         this.renderer.domElement.style.outline = 'none';
         this.container.appendChild(this.renderer.domElement);
@@ -624,7 +624,7 @@ export class Viewer {
         // Title
         const title = document.createElement('div');
         title.style.cssText = 'font-size: 14px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #555; padding-bottom: 4px;';
-        title.textContent = 'Settings (M to toggle)';
+        title.textContent = 'Settings (Push M to toggle)';
         panel.appendChild(title);
 
         // Item selector (combo box matching SettingWindow)
