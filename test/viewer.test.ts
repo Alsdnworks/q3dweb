@@ -182,14 +182,17 @@ describe('Viewer settings panel', () => {
     expect(v.settingsContent?.children.length).toBeGreaterThan(0);
 
     // Trigger color text input change (valid)
-    const input = v.settingsContent!.querySelector('input[type=text]') as HTMLInputElement;
-    input.value = '#ff0000';
-    input.onchange?.(new Event('change'));
+    const textInputs = v.settingsContent!.querySelectorAll('input[type=text]');
+    expect(textInputs.length).toBe(1);
+
+    const colorInput = textInputs[0] as HTMLInputElement;
+    colorInput.value = '#ff0000';
+    colorInput.onchange?.(new Event('change'));
     expect(v.colorStr).toBe('#ff0000');
 
     // Invalid color is ignored
-    input.value = 'this-is-not-a-color';
-    input.onchange?.(new Event('change'));
+    colorInput.value = 'this-is-not-a-color';
+    colorInput.onchange?.(new Event('change'));
 
     // Show center toggle
     const cb = v.settingsContent!.querySelector('input[type=checkbox]') as HTMLInputElement;

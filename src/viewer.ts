@@ -65,6 +65,15 @@ interface LASStreamState extends LASMetadata {
     rawPointIndex: number;
 }
 
+interface ActiveLASGeoState {
+    bounds: LASBounds;
+    centerX: number;
+    centerY: number;
+    autoOriginLatLon: [number, number] | null;
+    appliedShiftX: number;
+    appliedShiftY: number;
+}
+
 function eulerToMatrix(roll: number, pitch: number, yaw: number): THREE.Matrix4 {
     const cx = Math.cos(roll), sx = Math.sin(roll);
     const cy = Math.cos(pitch), sy = Math.sin(pitch);
@@ -169,6 +178,8 @@ export class Viewer {
 
     // Background color string for settings
     colorStr: string = 'black';
+    manualLASEpsg: string = '';
+    activeLASGeoState: ActiveLASGeoState | null = null;
 
     // Film Maker
     filmMaker: FilmMaker = new FilmMaker();
@@ -739,6 +750,7 @@ export class Viewer {
         });
         colorInput.title = 'Use hex color, i.e. #FF4500';
         container.appendChild(colorInput);
+        this.cloudProjSettings(container);
 
         container.appendChild(this.makeCheckbox('Show Center Point', this.enableShowCenter, (v) => {
             this.enableShowCenter = v;
@@ -790,6 +802,8 @@ export class Viewer {
             container.appendChild(this.makeLabel('Points:'));
             container.appendChild(this.makeStaticValue(`${pointCount.toLocaleString()} pts`));
         }
+
+        this.cloudProjSettings(container);
 
         if (pointTypeUniform) {
             container.appendChild(this.makeLabel('Point Type:'));
@@ -941,6 +955,96 @@ export class Viewer {
         row.appendChild(cb);
         row.appendChild(lbl);
         return row;
+    }
+
+    private cloudProjSettings(container: HTMLElement): void {
+        if (!this.activeLASGeoState) return;
+        container.appendChild(this.makeLabel('LAS CRS (EPSG):'));
+        const lasCrsInput = this.makeTextInput(this.manualLASEpsg, (val) => {
+            this.manualLASEpsg = val.trim();
+            this.applyActiveLASGeoref();
+        });
+        lasCrsInput.placeholder = 'e.g. 4326 or EPSG:4326 and press Enter';
+        lasCrsInput.title = 'Used when LAS metadata CRS is missing or unsupported.';
+        container.appendChild(lasCrsInput);
+    }
+
+    private parseManualLASEpsg(): number | null {
+        const text = this.manualLASEpsg.trim();
+        if (!text) return null;
+        const match = text.match(/^(?:EPSG\s*:\s*)?(\d+)$/i);
+        if (!match) return null;
+        const epsg = parseInt(match[1], 10);
+        return Number.isFinite(epsg) && epsg > 0 ? epsg : null;
+    }
+
+    private resolveManualLASOriginLatLon(bounds: LASBounds): [number, number] | null {
+        const epsg = this.parseManualLASEpsg();
+        if (epsg === null) return null;
+        const cx = (bounds.minX + bounds.maxX) / 2;
+        const cy = (bounds.minY + bounds.maxY) / 2;
+        return projToLatLon(epsg, cx, cy);
+    }
+
+    private translateCurrentLASData(deltaX: number, deltaY: number): void {
+        if (deltaX === 0 && deltaY === 0) return;
+
+        if (this.posBuffer && this.posIndex > 0) {
+            for (let i = 0; i < this.posIndex * 3; i += 3) {
+                this.posBuffer[i] += deltaX;
+                this.posBuffer[i + 1] += deltaY;
+            }
+        }
+
+        const cloud = this.items['cloud'] as any;
+        const positionAttr = cloud?.geometry?.getAttribute?.('position') as THREE.BufferAttribute | undefined;
+        let movedVisibleCloud = false;
+        if (positionAttr && positionAttr.array instanceof Float32Array) {
+            const positions = positionAttr.array as Float32Array;
+            for (let i = 0; i < positions.length; i += 3) {
+                positions[i] += deltaX;
+                positions[i + 1] += deltaY;
+            }
+            positionAttr.needsUpdate = true;
+            cloud.geometry.computeBoundingBox?.();
+            movedVisibleCloud = true;
+        }
+
+        if (movedVisibleCloud) {
+            this.cameraCenter.x += deltaX;
+            this.cameraCenter.y += deltaY;
+            this.updateCamera();
+        }
+    }
+
+    private applyActiveLASGeoref(): void {
+        const state = this.activeLASGeoState;
+        if (!state) return;
+
+        const manualOriginLatLon = state.autoOriginLatLon ? null : this.resolveManualLASOriginLatLon(state.bounds);
+        const nextOriginLatLon = state.autoOriginLatLon ?? manualOriginLatLon;
+        const nextShiftX = nextOriginLatLon ? state.centerX : 0;
+        const nextShiftY = nextOriginLatLon ? state.centerY : 0;
+        const deltaX = state.appliedShiftX - nextShiftX;
+        const deltaY = state.appliedShiftY - nextShiftY;
+
+        if (this.lasStream) {
+            this.lasStream.shiftX = nextShiftX;
+            this.lasStream.shiftY = nextShiftY;
+        }
+        if (deltaX !== 0 || deltaY !== 0) {
+            this.translateCurrentLASData(deltaX, deltaY);
+        }
+
+        state.appliedShiftX = nextShiftX;
+        state.appliedShiftY = nextShiftY;
+
+        if (nextOriginLatLon) {
+            this.addLASOverlay(nextOriginLatLon, state.bounds);
+        } else if (!state.autoOriginLatLon) {
+            this.removeItem('gnss');
+            this.requestRender();
+        }
     }
 
     // ========== Film Maker ==========
@@ -1458,6 +1562,7 @@ export class Viewer {
         this.valBuffer = null;
         this.rgbBuffer = null;
         this.lasStream = null;
+        this.activeLASGeoState = null;
         if (this.loadingOverlay) {
             this.loadingOverlay.style.display = 'flex';
             this.loadingOverlay.innerHTML = `<div style="color: white; font-size: 24px; font-family: sans-serif; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 8px;">Error: ${message}</div>`;
@@ -1552,6 +1657,7 @@ export class Viewer {
         this.fullBufferWriteOffset = 0;
         this.chunkList = [];
         this.currentFormat = this.detectFormat(filename);
+        this.activeLASGeoState = null;
 
         if (this.loadingOverlay) {
             this.loadingOverlay.style.display = 'flex';
@@ -1861,9 +1967,9 @@ export class Viewer {
         let originLatLon: [number, number] | null = null;
         let shiftX = 0;
         let shiftY = 0;
+        const cx = bounds ? (bounds.minX + bounds.maxX) / 2 : 0;
+        const cy = bounds ? (bounds.minY + bounds.maxY) / 2 : 0;
         if (geo && bounds) {
-            const cx = (bounds.minX + bounds.maxX) / 2;
-            const cy = (bounds.minY + bounds.maxY) / 2;
             if (geo.epsg !== undefined) {
                 originLatLon = projToLatLon(geo.epsg, cx, cy);
             }
@@ -1876,10 +1982,30 @@ export class Viewer {
                 shiftY = cy;
                 console.log(`LAS georef: EPSG=${geo.epsg ?? 'wkt'} (${geo.asciiParams ?? ''}), ` +
                     `centre=(${originLatLon[0].toFixed(6)}, ${originLatLon[1].toFixed(6)})`);
-            } else if (geo.epsg !== undefined) {
+            }
+        }
+        const autoOriginLatLon = originLatLon;
+        if (!originLatLon && bounds) {
+            const manualOriginLatLon = this.resolveManualLASOriginLatLon(bounds);
+            if (manualOriginLatLon) {
+                originLatLon = manualOriginLatLon;
+                shiftX = cx;
+                shiftY = cy;
+                console.log(`LAS georef: manual EPSG=${this.manualLASEpsg}, ` +
+                    `centre=(${originLatLon[0].toFixed(6)}, ${originLatLon[1].toFixed(6)})`);
+            } else if (geo?.epsg !== undefined) {
                 console.warn(`LAS georef EPSG:${geo.epsg} not supported for overlay.`);
             }
         }
+
+        this.activeLASGeoState = bounds ? {
+            bounds,
+            centerX: cx,
+            centerY: cy,
+            autoOriginLatLon,
+            appliedShiftX: shiftX,
+            appliedShiftY: shiftY,
+        } : null;
 
         return {
             versionMajor,
