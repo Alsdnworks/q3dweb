@@ -1,14 +1,13 @@
 name: GitHub Pages
 
-# Auto-deploy temporarily disabled. The workflow can still be launched
-# manually from the Actions tab. To re-enable automatic deploys on push,
-# un-comment the `push` block below.
+# Deploy the production site from main at the Pages root and
+# the latest develop branch build under /develop.
 on:
   workflow_dispatch: {}
   push:
     branches:
+      - develop
       - main
-      - master
 
 permissions:
   contents: read
@@ -25,6 +24,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -35,8 +36,42 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build cloud viewer for Pages
-        run: npm run build:pages
+      - name: Build production + develop Pages site
+        run: |
+          set -euxo pipefail
+
+          SITE_DIR="$RUNNER_TEMP/pages-site"
+          ROOT_WORKTREE="$RUNNER_TEMP/pages-root"
+          DEVELOP_WORKTREE="$RUNNER_TEMP/pages-develop"
+
+          rm -rf "$SITE_DIR" "$ROOT_WORKTREE" "$DEVELOP_WORKTREE"
+          mkdir -p "$SITE_DIR"
+
+          git fetch --no-tags origin main develop
+
+          build_site() {
+            local branch="$1"
+            local worktree="$2"
+            local subdir="$3"
+            local output_dir="$SITE_DIR"
+
+            git worktree add --detach "$worktree" "origin/$branch"
+            pushd "$worktree"
+            npm ci
+            npm run build:pages
+            popd
+
+            if [[ -n "$subdir" ]]; then
+              output_dir="$SITE_DIR/$subdir"
+            fi
+
+            mkdir -p "$output_dir"
+            cp -a "$worktree/dist/." "$output_dir/"
+            git worktree remove --force "$worktree"
+          }
+
+          build_site main "$ROOT_WORKTREE" ""
+          build_site develop "$DEVELOP_WORKTREE" "develop"
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
@@ -44,13 +79,13 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: ${{ runner.temp }}/pages-site
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
     environment:
-      name: github-pages
+      name: ${{ github.ref_name == 'develop' && 'github-pages-develop' || 'github-pages' }}
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Deploy to GitHub Pages
