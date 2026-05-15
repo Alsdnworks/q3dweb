@@ -156,7 +156,7 @@ describe('Viewer parseLAS georef branches', () => {
         expect(positions[1]).toBeCloseTo(5);
         expect(v.items['gnss']).toBeUndefined();
         expect(v.settingsItemSelect?.value).toBe('cloud');
-        expect(v.settingsContent?.textContent).toContain('LAS CRS (EPSG):');
+        expect(v.settingsContent?.textContent).toContain('Cloud CRS (EPSG):');
 
         const textInputs = v.settingsContent!.querySelectorAll('input[type=text]');
         const epsgInput = textInputs[textInputs.length - 1] as HTMLInputElement;

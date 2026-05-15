@@ -70,6 +70,8 @@ interface ActiveLASGeoState {
     centerX: number;
     centerY: number;
     autoOriginLatLon: [number, number] | null;
+    baseShiftX: number;
+    baseShiftY: number;
     appliedShiftX: number;
     appliedShiftY: number;
 }
@@ -977,15 +979,42 @@ export class Viewer {
         return row;
     }
 
+    private setActiveCloudGeoState(
+        bounds: LASBounds | null,
+        options: {
+            autoOriginLatLon?: [number, number] | null;
+            baseShiftX?: number;
+            baseShiftY?: number;
+            appliedShiftX?: number;
+            appliedShiftY?: number;
+        } = {}
+    ): void {
+        if (!bounds) {
+            this.activeLASGeoState = null;
+            return;
+        }
+
+        this.activeLASGeoState = {
+            bounds,
+            centerX: (bounds.minX + bounds.maxX) / 2,
+            centerY: (bounds.minY + bounds.maxY) / 2,
+            autoOriginLatLon: options.autoOriginLatLon ?? null,
+            baseShiftX: options.baseShiftX ?? 0,
+            baseShiftY: options.baseShiftY ?? 0,
+            appliedShiftX: options.appliedShiftX ?? 0,
+            appliedShiftY: options.appliedShiftY ?? 0,
+        };
+    }
+
     private cloudProjSettings(container: HTMLElement): void {
         if (!this.activeLASGeoState) return;
-        container.appendChild(this.makeLabel('LAS CRS (EPSG):'));
+        container.appendChild(this.makeLabel('Cloud CRS (EPSG):'));
         const lasCrsInput = this.makeTextInput(this.manualLASEpsg, (val) => {
             this.manualLASEpsg = val.trim();
             this.applyActiveLASGeoref();
         });
         lasCrsInput.placeholder = 'e.g. 4326 or EPSG:4326 and press Enter';
-        lasCrsInput.title = 'Used when LAS metadata CRS is missing or unsupported.';
+        lasCrsInput.title = 'Used when embedded CRS metadata is missing or unsupported.';
         container.appendChild(lasCrsInput);
     }
 
@@ -1043,14 +1072,14 @@ export class Viewer {
 
         const manualOriginLatLon = state.autoOriginLatLon ? null : this.resolveManualLASOriginLatLon(state.bounds);
         const nextOriginLatLon = state.autoOriginLatLon ?? manualOriginLatLon;
-        const nextShiftX = nextOriginLatLon ? state.centerX : 0;
-        const nextShiftY = nextOriginLatLon ? state.centerY : 0;
+        const nextShiftX = nextOriginLatLon ? state.centerX - state.baseShiftX : 0;
+        const nextShiftY = nextOriginLatLon ? state.centerY - state.baseShiftY : 0;
         const deltaX = state.appliedShiftX - nextShiftX;
         const deltaY = state.appliedShiftY - nextShiftY;
 
         if (this.lasStream) {
-            this.lasStream.shiftX = nextShiftX;
-            this.lasStream.shiftY = nextShiftY;
+            this.lasStream.shiftX = state.baseShiftX + nextShiftX;
+            this.lasStream.shiftY = state.baseShiftY + nextShiftY;
         }
         if (deltaX !== 0 || deltaY !== 0) {
             this.translateCurrentLASData(deltaX, deltaY);
@@ -1850,7 +1879,7 @@ export class Viewer {
         this.pcdHeader = pcdHeader as PCDHeader;
         console.log("Parsed Header:", this.pcdHeader);
     }
-
+    
     private getFieldSpec(fieldName: string): { offset: number; type: string; size: number; count: number } | null {
         if (!this.pcdHeader?.fields || !this.pcdHeader?.types || !this.pcdHeader?.sizes || !this.pcdHeader?.counts) {
             return null;
@@ -1981,7 +2010,6 @@ export class Viewer {
 
         console.log(`LAS ${versionMajor}.${versionMinor}, Format ${pointDataRecordFormat}, ` +
             `${numberOfPoints} points, Record Length ${pointDataRecordLength}`);
-
         const geo = parseLASGeoInfo(data);
         const bounds = readLASBounds(data) as LASBounds | null;
         let originLatLon: [number, number] | null = null;
@@ -2018,14 +2046,13 @@ export class Viewer {
             }
         }
 
-        this.activeLASGeoState = bounds ? {
-            bounds,
-            centerX: cx,
-            centerY: cy,
+        this.setActiveCloudGeoState(bounds, {
             autoOriginLatLon,
+            baseShiftX: 0,
+            baseShiftY: 0,
             appliedShiftX: shiftX,
             appliedShiftY: shiftY,
-        } : null;
+        });
 
         return {
             versionMajor,
@@ -2618,16 +2645,41 @@ export class Viewer {
 
         // First pass: mean for recentering (use double to avoid precision loss).
         let sumX = 0, sumY = 0, sumZ = 0, n = 0;
+        let minX = Infinity, maxX = -Infinity;
+        let minY = Infinity, maxY = -Infinity;
+        let minZ = Infinity, maxZ = -Infinity;
         for (let i = 0; i < totalPoints; i += sampleRatio) {
-            sumX += src[i * 3];
-            sumY += src[i * 3 + 1];
-            sumZ += src[i * 3 + 2];
+            const x = src[i * 3];
+            const y = src[i * 3 + 1];
+            const z = src[i * 3 + 2];
+            sumX += x;
+            sumY += y;
+            sumZ += z;
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+            if (z < minZ) minZ = z;
+            if (z > maxZ) maxZ = z;
             n++;
             if (n >= estimated) break;
         }
         const cx = n > 0 ? sumX / n : 0;
         const cy = n > 0 ? sumY / n : 0;
         const cz = n > 0 ? sumZ / n : 0;
+        this.setActiveCloudGeoState(Number.isFinite(minX) ? {
+            minX,
+            maxX,
+            minY,
+            maxY,
+            minZ,
+            maxZ,
+        } : null, {
+            baseShiftX: cx,
+            baseShiftY: cy,
+            appliedShiftX: 0,
+            appliedShiftY: 0,
+        });
 
         let parsed = 0;
         for (let i = 0; i < totalPoints; i += sampleRatio) {
@@ -2977,6 +3029,21 @@ export class Viewer {
             const center = new THREE.Vector3();
             cloud.geometry.boundingBox.getCenter(center);
             this.cameraCenter.copy(center);
+            if (!this.activeLASGeoState) {
+                this.setActiveCloudGeoState({
+                    minX: cloud.geometry.boundingBox.min.x,
+                    maxX: cloud.geometry.boundingBox.max.x,
+                    minY: cloud.geometry.boundingBox.min.y,
+                    maxY: cloud.geometry.boundingBox.max.y,
+                    minZ: cloud.geometry.boundingBox.min.z,
+                    maxZ: cloud.geometry.boundingBox.max.z,
+                }, {
+                    baseShiftX: 0,
+                    baseShiftY: 0,
+                    appliedShiftX: 0,
+                    appliedShiftY: 0,
+                });
+            }
             const size = new THREE.Vector3();
             cloud.geometry.boundingBox.getSize(size);
             const maxDim = Math.max(size.x, size.y, size.z);
@@ -2987,6 +3054,10 @@ export class Viewer {
         }
 
         this.addItem("cloud", cloud);
+
+        if (this.activeLASGeoState && !this.activeLASGeoState.autoOriginLatLon && this.parseManualLASEpsg() !== null) {
+            this.applyActiveLASGeoref();
+        }
 
         if (this.statusElement) this.statusElement.textContent = `${count.toLocaleString()} points`;
         if (this.loadingOverlay) this.loadingOverlay.style.display = 'none';
